@@ -20,123 +20,123 @@ const (
 )
 
 type (
-
 	Request struct {
 		Params map[string]string
-		Files map[string]string
+		Files  map[string]string
 	}
 
 	Client struct {
-		BaseURL *url.URL
-		ApiKey string
-		SoftId int
-		Callback string
-		DefaultTimeout int
+		BaseURL          *url.URL
+		ApiKey           string
+		SoftId           int
+		Callback         string
+		DefaultTimeout   int
 		RecaptchaTimeout int
-		PollingInterval int
-		
+		PollingInterval  int
+
+		logger     *log.Logger
 		httpClient *http.Client
 	}
 
 	Canvas struct {
-		File string
-		Base64 string
-		PreviousId int
-		CanSkip bool
-		Lang string
-		HintText string
+		File            string
+		Base64          string
+		PreviousId      int
+		CanSkip         bool
+		Lang            string
+		HintText        string
 		HintImageBase64 string
-		HintImageFile string
+		HintImageFile   string
 	}
 
 	Capy struct {
-		SiteKey string
-		Url string
+		SiteKey   string
+		Url       string
 		ApiServer string
 	}
 
 	Coordinates struct {
-		File string
-		Base64 string
-		Lang string
-		HintText string
+		File            string
+		Base64          string
+		Lang            string
+		HintText        string
 		HintImageBase64 string
-		HintImageFile string
+		HintImageFile   string
 	}
 
 	FunCaptcha struct {
-		SiteKey string
-		Url string
-		Surl string
+		SiteKey   string
+		Url       string
+		Surl      string
 		UserAgent string
-		Data map[string]string
+		Data      map[string]string
 	}
 
 	GeeTest struct {
-		GT string
+		GT        string
 		Challenge string
-		Url string
+		Url       string
 		ApiServer string
 	}
 
 	Grid struct {
-		File string
-		Base64 string
-		Rows int
-		Cols int
-		PreviousId int
-		CanSkip bool
-		Lang string
-		HintText string
+		File            string
+		Base64          string
+		Rows            int
+		Cols            int
+		PreviousId      int
+		CanSkip         bool
+		Lang            string
+		HintText        string
 		HintImageBase64 string
-		HintImageFile string
+		HintImageFile   string
 	}
 
 	HCaptcha struct {
 		SiteKey string
-		Url string
+		Url     string
 	}
 
 	KeyCaptcha struct {
-		UserId int
-		SessionId string
-		WebServerSign string
+		UserId         int
+		SessionId      string
+		WebServerSign  string
 		WebServerSign2 string
-		Url string
+		Url            string
 	}
 
 	Normal struct {
-		File string
-		Base64 string
-		Phrase bool
-		CaseSensitive bool
-		Calc bool
-		Numberic int
-		MinLen int
-		MaxLen int		
-		Lang string
-		HintText string
+		File            string
+		Base64          string
+		Phrase          bool
+		CaseSensitive   bool
+		Calc            bool
+		Numberic        int
+		MinLen          int
+		MaxLen          int
+		Lang            string
+		HintText        string
 		HintImageBase64 string
-		HintImageFile string
+		HintImageFile   string
 	}
 
 	ReCaptcha struct {
-		SiteKey string
-		Url string
+		SiteKey   string
+		Url       string
 		Invisible bool
-		Version string
-		Action string
-		Score float64
+		Version   string
+		Action    string
+		Score     float64
 	}
 
 	Rotate struct {
-		File string
-		Files []string
-		Angle int
-		Lang string
-		HintText string
+		File            string
+		Files           []string
+		Angle           int
+		Lang            string
+		HintText        string
 		HintImageBase64 string
-		HintImageFile string
+		HintImageFile   string
 	}
 
 	Text struct {
@@ -147,19 +147,19 @@ type (
 
 var (
 	ErrNetwork = errors.New("api2captcha: Network failure")
-	ErrApi = errors.New("api2captcha: API error")
+	ErrApi     = errors.New("api2captcha: API error")
 	ErrTimeout = errors.New("api2captcha: Request timeout")
 )
 
 func NewClient(apiKey string) *Client {
 	base, _ := url.Parse(BaseURL)
 	return &Client{
-		BaseURL: base,
-		ApiKey:  apiKey,
-		DefaultTimeout: 10,
-		PollingInterval: 10,
+		BaseURL:          base,
+		ApiKey:           apiKey,
+		DefaultTimeout:   10,
+		PollingInterval:  10,
 		RecaptchaTimeout: 600,
-		httpClient: &http.Client{},
+		httpClient:       &http.Client{},
 	}
 }
 
@@ -170,7 +170,7 @@ func (c *Client) res(req Request) (*string, error) {
 
 	req.Params["key"] = c.ApiKey
 	c.httpClient.Timeout = time.Duration(c.DefaultTimeout) * time.Second
-	
+
 	var resp *http.Response = nil
 
 	values := url.Values{}
@@ -178,13 +178,13 @@ func (c *Client) res(req Request) (*string, error) {
 		values.Add(key, val)
 	}
 	uri.RawQuery = values.Encode()
-	
+
 	var err error = nil
 	resp, err = http.Get(uri.String())
 	if err != nil {
 		return nil, ErrNetwork
 	}
-	
+
 	defer resp.Body.Close()
 	body := &bytes.Buffer{}
 	_, err = body.ReadFrom(resp.Body)
@@ -192,7 +192,10 @@ func (c *Client) res(req Request) (*string, error) {
 		return nil, err
 	}
 	data := body.String()
-	log.Println("Status "+resp.Status+" data "+data)
+
+	if c.logger != nil {
+		c.logger.Println("Status " + resp.Status + " data " + data)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, ErrApi
@@ -207,7 +210,7 @@ func (c *Client) res(req Request) (*string, error) {
 
 func (c *Client) resAction(action string) (*string, error) {
 	req := Request{
-		Params: map[string]string{"action":action},
+		Params: map[string]string{"action": action},
 	}
 
 	return c.res(req)
@@ -274,7 +277,7 @@ func (c *Client) Send(req Request) (string, error) {
 			return "", ErrNetwork
 		}
 	}
-	
+
 	defer resp.Body.Close()
 	body := &bytes.Buffer{}
 	_, err := body.ReadFrom(resp.Body)
@@ -282,7 +285,10 @@ func (c *Client) Send(req Request) (string, error) {
 		return "", err
 	}
 	data := body.String()
-	log.Println("Status "+resp.Status+" data "+data)
+
+	if c.logger != nil {
+		c.logger.Println("Status " + resp.Status + " data " + data)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return "", ErrApi
@@ -317,7 +323,7 @@ func (c *Client) Solve(req Request) (string, error) {
 
 	_, ok := req.Params["soft_id"]
 	if c.SoftId != 0 && !ok {
-		req.Params["soft_id"] = strconv.FormatInt(int64(c.SoftId), 10);
+		req.Params["soft_id"] = strconv.FormatInt(int64(c.SoftId), 10)
 	}
 
 	id, err := c.Send(req)
@@ -330,7 +336,7 @@ func (c *Client) Solve(req Request) (string, error) {
 		return id, nil
 	}
 
-	timeout := c.DefaultTimeout	
+	timeout := c.DefaultTimeout
 	if req.Params["method"] == "userrecaptcha" {
 		timeout = c.RecaptchaTimeout
 	}
@@ -355,7 +361,7 @@ func (c *Client) WaitForResult(id string, timeout int, interval int) (string, er
 		if err != nil && err != ErrNetwork {
 			return "", err
 		}
-		
+
 		now = time.Now()
 	}
 
@@ -364,7 +370,7 @@ func (c *Client) WaitForResult(id string, timeout int, interval int) (string, er
 
 func (c *Client) GetResult(id string) (*string, error) {
 	req := Request{
-		Params: map[string]string{"action":"get", "id": id},
+		Params: map[string]string{"action": "get", "id": id},
 	}
 
 	data, err := c.res(req)
@@ -393,9 +399,9 @@ func (c *Client) GetBalance() (float64, error) {
 	return strconv.ParseFloat(*data, 64)
 }
 
-func (c *Client) Report(id string, correct bool) (error) {
+func (c *Client) Report(id string, correct bool) error {
 	req := Request{
-		Params: map[string]string{"id":id},
+		Params: map[string]string{"id": id},
 	}
 	if correct {
 		req.Params["action"] = "reportgood"
@@ -407,6 +413,9 @@ func (c *Client) Report(id string, correct bool) (error) {
 	return err
 }
 
+func (c *Client) SetLogger(l *log.Logger) {
+	c.logger = l
+}
 
 func (req *Request) SetProxy(proxyType string, uri string) {
 	req.Params["proxytype"] = proxyType
@@ -423,8 +432,8 @@ func (req *Request) SetCallback(callback string) {
 
 func (c *Canvas) ToRequest() Request {
 	req := Request{
-		Params: map[string]string{"canvas":"1", "recaptcha": "1"},
-		Files: map[string]string{},
+		Params: map[string]string{"canvas": "1", "recaptcha": "1"},
+		Files:  map[string]string{},
 	}
 	if c.File != "" {
 		req.Files["file"] = c.File
@@ -457,7 +466,7 @@ func (c *Canvas) ToRequest() Request {
 func (c *Normal) ToRequest() Request {
 	req := Request{
 		Params: map[string]string{},
-		Files: map[string]string{},
+		Files:  map[string]string{},
 	}
 	if c.File != "" {
 		req.Files["file"] = c.File
@@ -503,7 +512,7 @@ func (c *Normal) ToRequest() Request {
 
 func (c *Capy) ToRequest() Request {
 	req := Request{
-		Params: map[string]string{"method":"capy"},
+		Params: map[string]string{"method": "capy"},
 	}
 	if c.SiteKey != "" {
 		req.Params["captchakey"] = c.SiteKey
@@ -521,7 +530,7 @@ func (c *Capy) ToRequest() Request {
 func (c *Coordinates) ToRequest() Request {
 	req := Request{
 		Params: map[string]string{"coordinatescaptcha": "1"},
-		Files: map[string]string{},
+		Files:  map[string]string{},
 	}
 	if c.File != "" {
 		req.Files["file"] = c.File
@@ -594,7 +603,7 @@ func (c *GeeTest) ToRequest() Request {
 func (c *Grid) ToRequest() Request {
 	req := Request{
 		Params: map[string]string{},
-		Files: map[string]string{},
+		Files:  map[string]string{},
 	}
 	if c.File != "" {
 		req.Files["file"] = c.File
@@ -696,14 +705,14 @@ func (c *ReCaptcha) ToRequest() Request {
 func (c *Rotate) ToRequest() Request {
 	req := Request{
 		Params: map[string]string{"method": "rotatecaptcha"},
-		Files: map[string]string{},
+		Files:  map[string]string{},
 	}
 	if c.File != "" {
 		req.Files["file_1"] = c.File
 	}
 	if c.Files != nil {
 		for i := 0; i < len(c.Files); i++ {
-			name := "file_" + strconv.FormatInt(int64(i) + 1, 64)
+			name := "file_" + strconv.FormatInt(int64(i)+1, 64)
 			req.Files[name] = c.Files[i]
 		}
 	}
@@ -722,13 +731,13 @@ func (c *Rotate) ToRequest() Request {
 	if c.HintImageFile != "" {
 		req.Files["imginstructions"] = c.HintImageFile
 	}
-	
+
 	return req
 }
 
 func (c *Text) ToRequest() Request {
 	req := Request{
-		Params: map[string]string{"method":"post"},
+		Params: map[string]string{"method": "post"},
 	}
 	if c.Text != "" {
 		req.Params["textcaptcha"] = c.Text
